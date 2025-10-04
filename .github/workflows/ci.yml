@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write  # allow the workflow to commit reports
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      
+      - name: Ensure no files other than main.py were modified
+        run: |
+          set -eo pipefail
+          echo "Determining base SHA..."
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+            
+          # Try to fetch the base SHA; if that fails, fall back to origin/main
+          if git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
+            BASE_REF="${BASE_SHA}"
+          else
+            echo "Could not fetch base SHA (${BASE_SHA}); falling back to origin/main"
+            git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
+            BASE_REF="origin/main"
+          fi
+            
+          echo "Comparing HEAD against ${BASE_REF}..."
+          CHANGED_FILES="$(git diff --name-only ${BASE_REF}...HEAD || true)"
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+            
+          # If no changed files detected, allow the job to continue
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed files detected."
+            exit 0
+          fi
+            
+          # Fail if any changed file is not exactly main.py
+          for f in $CHANGED_FILES; do
+            if [ "$f" != "main.py" ]; then
+              echo "Error: file modified other than main.py: $f"
+              exit 1
+            fi
+              done
+            
+          echo "Only main.py was modified. Passing this check."
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install autopep8 isort pytest
+
+      - name: Run checks and collect reports
+        run: |
+          set -eo pipefail
+          mkdir -p reports
+          STATUS=0
+
+          echo "Running syntax check on main.py..."
+          # py_compile returns non-zero on syntax errors; capture stderr
+          python -m py_compile main.py 2> reports/syntax-report.txt || STATUS=1
+          if [ ! -s reports/syntax-report.txt ]; then
+            rm -f reports/syntax-report.txt
+          fi
+
+          echo "Checking autopep8 (style) for main.py..."
+          # autopep8 --diff prints diffs when changes are needed
+          autopep8 --diff main.py > reports/autopep8-report.txt || true
+          if [ ! -s reports/autopep8-report.txt ]; then
+            rm -f reports/autopep8-report.txt
+          else
+            STATUS=1
+          fi
+
+          echo "Checking imports with isort..."
+          # isort --check will exit non-zero if imports need sorting; capture diff/output
+          isort --check --diff . > reports/isort-report.txt 2>&1 || true
+          if [ ! -s reports/isort-report.txt ]; then
+            rm -f reports/isort-report.txt
+          else
+            STATUS=1
+          fi
+
+          echo "Running pytest under tests/ ..."
+          pytest -q tests/ > reports/pytest-report.txt 2>&1 || STATUS=1
+
+          # store status for later inspection (not strictly required)
+          echo "$STATUS" > reports/ci-status.txt
+
+      - name: Commit and push reports (if any)
+        run: |
+          if [ -d reports ] && [ "$(ls -A reports)" ]; then
+            echo "Reports generated; committing to repository..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add reports
+            git commit -m "ci: add/refresh CI reports" || echo "No changes to commit"
+            git push
+          else
+            echo "No reports generated."
+          fi
+
+      - name: Fail job if any report exists
+        run: |
+          if [ -d reports ] && [ "$(ls -A reports)" ]; then
+            echo "One or more checks failed. Reports are in the 'reports' directory and were pushed to the repo."
+            exit 1
+          fi
