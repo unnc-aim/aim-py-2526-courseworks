@@ -1,6 +1,6 @@
 import random
 
-from main import AdvancedGrid, Facing, Grid
+from main import AdvancedGrid, Facing, Grid  # type: ignore
 
 
 class TestGrid:
@@ -233,3 +233,102 @@ class TestAdvancedGrid:
         # 测试 find_enemy
         self.grid.current_pos = self.enemy_pos
         assert self.grid.find_enemy() == True
+
+
+class TestRandomized:
+    """包含多次随机试验以捕捉边界和不同配置"""
+
+    def test_move_forward_random_trials(self):
+        """随机多次测试 move_forward 的正确性（可重复）"""
+        trials = 100
+        for _ in range(trials):
+            width = random.randint(0, 8)
+            height = random.randint(0, 8)
+            enemy_pos = (random.randint(0, width), random.randint(0, height))
+            grid = Grid(width, height, enemy_pos)
+
+            # random position within bounds
+            x = random.randint(0, width)
+            y = random.randint(0, height)
+            grid.current_pos = (x, y)
+
+            # random facing
+            grid.current_direction = random.choice(list(Facing))
+
+            # compute expected
+            ex_x, ex_y = x, y
+            if grid.current_direction == Facing.UP:
+                ex_y = min(height, y + 1)
+            elif grid.current_direction == Facing.DOWN:
+                ex_y = max(0, y - 1)
+            elif grid.current_direction == Facing.RIGHT:
+                ex_x = min(width, x + 1)
+            elif grid.current_direction == Facing.LEFT:
+                ex_x = max(0, x - 1)
+
+            res = grid.move_forward()
+            assert res == (ex_x, ex_y)
+            assert grid.current_pos == (ex_x, ex_y)
+
+    def test_turns_random_trials(self):
+        """随机多次测试 turn_left 和 turn_right 的环转逻辑"""
+        trials = 100
+        for _ in range(trials):
+            facing = random.choice(list(Facing))
+            # left
+            g = Grid(5, 5, (0, 0))
+            g.current_direction = facing
+            expected_left = Facing((facing.value + 1) % 4)
+            expected_right = Facing((facing.value - 1) % 4)
+            assert g.turn_left() == expected_left
+            # reset and test right
+            g.current_direction = facing
+            assert g.turn_right() == expected_right
+
+    def test_record_and_get_randomized(self):
+        """随机测试字典记录与读取"""
+        width = 6
+        height = 6
+        grid = Grid(width, height, (0, 0))
+        records = {}
+        steps = random.randint(5, 20)
+        for s in range(1, steps + 1):
+            pos = (random.randint(0, width), random.randint(0, height))
+            grid.current_pos = pos
+            grid.record_position(s)
+            records[s] = pos
+
+        for s in range(1, steps + 1):
+            assert grid.get_position_at_step(s) == records.get(s)
+
+    def test_advancedgrid_random_walk(self):
+        """随机多次测试 AdvancedGrid 的步数统计与曼哈顿距离"""
+        trials = 50
+        for _ in range(trials):
+            width = random.randint(3, 8)
+            height = random.randint(3, 8)
+            enemy = (random.randint(0, width), random.randint(0, height))
+            g = AdvancedGrid(width, height, enemy)
+            # perform a random number of moves and track expected position
+            moves = random.randint(0, 10)
+            # pick random starting pos within bounds
+            sx = random.randint(0, width)
+            sy = random.randint(0, height)
+            g.current_pos = (sx, sy)
+            g.steps = 0
+            # random sequence of facings
+            for i in range(moves):
+                g.current_direction = random.choice(list(Facing))
+                prev_pos = g.current_pos
+                res = g.move_forward()
+                # steps should increment by 1 each move
+                assert g.steps == i + 1
+                # position must be updated and within bounds
+                px, py = res
+                assert 0 <= px <= width
+                assert 0 <= py <= height
+
+            # test manhattan distance computation
+            cx, cy = g.current_pos
+            ex_dist = abs(cx - enemy[0]) + abs(cy - enemy[1])
+            assert g.distance_to_enemy() == ex_dist
