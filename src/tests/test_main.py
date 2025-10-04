@@ -24,6 +24,41 @@ class TestGrid:
         assert 0 <= x <= self.width
         assert 0 <= y <= self.height
 
+    def test_current_pos_setter_accepts_and_casts(self):
+        """测试 current_pos setter 是否接受浮点数并转换为整数"""
+        g = Grid(5, 5, (0, 0))
+        g.current_pos = (1.9, 2.1)  # type: ignore
+        assert g.current_pos == (1, 2)
+
+    def test_current_pos_setter_type_error(self):
+        """测试 current_pos setter 在传入非法类型时抛出 TypeError"""
+        g = Grid(5, 5, (0, 0))
+        try:
+            # list instead of tuple
+            g.current_pos = [1, 2]  # type: ignore
+            raise AssertionError("TypeError not raised for non-tuple value")
+        except TypeError:
+            pass
+
+    def test_current_pos_setter_length_error(self):
+        """测试 current_pos setter 在传入长度不为2的tuple时抛出 TypeError"""
+        g = Grid(5, 5, (0, 0))
+        try:
+            g.current_pos = (1, 2, 3)  # type: ignore # length 3 tuple
+            raise AssertionError("TypeError not raised for wrong length tuple")
+        except TypeError:
+            pass
+
+    def test_current_pos_setter_clamps_to_bounds(self):
+        """测试 current_pos setter 会将超出边界的值 clamp 到合法范围"""
+        g = Grid(3, 4, (0, 0))
+        # x beyond width, y beyond height
+        g.current_pos = (10, 20)
+        assert g.current_pos == (3, 4)
+        # negative values clamp to 0
+        g.current_pos = (-5, -2)
+        assert g.current_pos == (0, 0)
+
     def test_move_forward_up(self):
         """测试向上移动"""
         self.grid.current_direction = Facing.UP
@@ -142,28 +177,33 @@ class TestGrid:
     # ===================== Question 4 Tests (字典操作) =====================
     def test_record_position(self):
         """测试记录位置到字典"""
-        self.grid.current_pos = (1, 2)
+        # choose positions that are within bounds (clamp if needed)
+        p1 = (min(1, self.grid.width), min(2, self.grid.height))
+        self.grid.current_pos = p1
         self.grid.record_position(1)
         assert 1 in self.grid.position_history
-        assert self.grid.position_history[1] == (1, 2)
+        assert self.grid.position_history[1] == p1
 
-        self.grid.current_pos = (3, 4)
+        p2 = (min(3, self.grid.width), min(4, self.grid.height))
+        self.grid.current_pos = p2
         self.grid.record_position(2)
         assert 2 in self.grid.position_history
-        assert self.grid.position_history[2] == (3, 4)
+        assert self.grid.position_history[2] == p2
 
     def test_get_position_at_step(self):
         """测试从字典获取位置"""
-        self.grid.current_pos = (1, 2)
+        p1 = (min(1, self.grid.width), min(2, self.grid.height))
+        self.grid.current_pos = p1
         self.grid.record_position(1)
-        self.grid.current_pos = (3, 4)
+        p2 = (min(3, self.grid.width), min(4, self.grid.height))
+        self.grid.current_pos = p2
         self.grid.record_position(2)
 
         result = self.grid.get_position_at_step(1)
-        assert result == (1, 2)
+        assert result == p1
 
         result = self.grid.get_position_at_step(2)
-        assert result == (3, 4)
+        assert result == p2
 
         # 测试不存在的步数
         result = self.grid.get_position_at_step(99)
@@ -176,8 +216,8 @@ class TestAdvancedGrid:
     def setup_method(self):
         """在每个测试方法之前运行"""
         # choose a width large enough for two right moves from x=2 -> ensure tests stable
-        self.width = random.randint(5, 7)
-        self.height = random.randint(3, 7)
+        self.width = 7
+        self.height = 7
         self.enemy_pos = (5, 5)
         self.grid = AdvancedGrid(self.width, self.height, self.enemy_pos)
 
