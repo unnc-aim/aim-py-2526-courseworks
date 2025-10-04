@@ -146,5 +146,12 @@ jobs:
             exit 1
           else
             echo "All checks passed." >> "$GITHUB_STEP_SUMMARY"
+            RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "## Action run link" >> "$GITHUB_STEP_SUMMARY"
+            echo "- 请将下面链接复制并提交到作业问卷：" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Action run URL: ${RUN_URL}"
             exit 0
           fi
