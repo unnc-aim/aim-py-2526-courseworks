@@ -1,3 +1,6 @@
+"""
+A simple robot simulator on a 2D grid.
+"""
 
 from enum import Enum
 from typing import Tuple
