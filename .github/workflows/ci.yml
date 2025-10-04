@@ -47,26 +47,25 @@ jobs:
             exit 0
           else
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "${CHANGED_FILES}" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "${CHANGED_FILES}" | awk 'NR==1 && NF==0{next} {print}' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          DISALLOWED=""
+          DISALLOWED_LIST=()
           for f in ${CHANGED_FILES}; do
             if [ "${f}" != "main.py" ]; then
-              # accumulate with a real newline so summary shows each file on its own line
-              DISALLOWED="${DISALLOWED}"$'\n'"${f}"
+              DISALLOWED_LIST+=("${f}")
             fi
           done
 
-          if [ -n "${DISALLOWED}" ]; then
+          if [ ${#DISALLOWED_LIST[@]} -gt 0 ]; then
             echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
             echo 'The workflow only permits changes to `main.py`' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            printf '%s\n' "${DISALLOWED#\n}" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "${DISALLOWED_LIST[@]}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "Disallowed modification(s) detected." >> "$GITHUB_STEP_SUMMARY"
-            echo "Disallowed modification(s) detected: ${DISALLOWED#\n}" >&2
+            printf 'Disallowed modification(s) detected: %s\n' "${DISALLOWED_LIST[*]}" >&2
             exit 1
           fi
 
