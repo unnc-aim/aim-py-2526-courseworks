@@ -81,11 +81,12 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          # Enforce that only main.py may be modified
+          # Enforce that only main.py may be modified — fail immediately if any other file changed
           for f in ${CHANGED_FILES}; do
             if [ "${f}" != "main.py" ]; then
               echo "Only 'main.py' may be modified in this workflow; found: ${f}" >> "$GITHUB_STEP_SUMMARY"
-              FAIL=1
+              echo "Workflow disallowed modification detected: ${f}" >&2
+              exit 1
             fi
           done
 
