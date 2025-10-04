@@ -1,6 +1,6 @@
+import os
 import subprocess
 import sys
-import os
 
 
 def test_main_outputs_hello_world():
