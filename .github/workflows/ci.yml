@@ -54,15 +54,16 @@ jobs:
           DISALLOWED=""
           for f in ${CHANGED_FILES}; do
             if [ "${f}" != "main.py" ]; then
-              DISALLOWED="${DISALLOWED}\n${f}"
+              # accumulate with a real newline so summary shows each file on its own line
+              DISALLOWED="${DISALLOWED}"$'\n'"${f}"
             fi
           done
 
           if [ -n "${DISALLOWED}" ]; then
             echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
-            echo 'The workflow only permits changes to `main.py`. The following files were modified:' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The workflow only permits changes to `main.py`' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "${DISALLOWED}" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "${DISALLOWED#\n}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "Disallowed modification(s) detected." >> "$GITHUB_STEP_SUMMARY"
             echo "Disallowed modification(s) detected: ${DISALLOWED#\n}" >&2
