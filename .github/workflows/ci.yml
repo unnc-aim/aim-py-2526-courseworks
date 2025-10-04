@@ -62,9 +62,9 @@ jobs:
             echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
             echo 'The workflow only permits changes to `main.py`. The following files were modified:' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "${DISALLOWED#\n}" >> "$GITHUB_STEP_SUMMARY"
+            echo "${DISALLOWED}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "Disallowed modification(s) detected; failing." >> "$GITHUB_STEP_SUMMARY"
+            echo "Disallowed modification(s) detected." >> "$GITHUB_STEP_SUMMARY"
             echo "Disallowed modification(s) detected: ${DISALLOWED#\n}" >&2
             exit 1
           fi
