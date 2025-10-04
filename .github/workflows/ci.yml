@@ -188,7 +188,6 @@ jobs:
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "Note: runs on non-main branches will not be considered final submissions. If you need the final result, please merge into the main branch and view the run on the main branch." >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "Action run URL: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           fi
