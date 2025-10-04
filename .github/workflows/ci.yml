@@ -17,6 +17,58 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
+      - name: Detect changed files and enforce main.py-only
+        shell: bash
+        run: |
+          set -eo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            BASE_BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            BASE_BRANCH_NAME="${{ github.ref_name }}"
+          fi
+
+          if [ -n "${BASE_SHA}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
+            BASE_REF="${BASE_SHA}"
+          elif [ -n "${BASE_BRANCH_NAME}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_BRANCH_NAME}" >/dev/null 2>&1; then
+            BASE_REF="origin/${BASE_BRANCH_NAME}"
+          else
+            echo "Could not fetch base (${BASE_SHA:-<none>}, branch ${BASE_BRANCH_NAME:-<none>}); falling back to origin/main" >> "$GITHUB_STEP_SUMMARY"
+            git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
+            BASE_REF="origin/main"
+          fi
+
+          CHANGED_FILES="$(git diff --name-only ${BASE_REF}...HEAD || true)"
+          echo "### Changed files" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "${CHANGED_FILES}" ]; then
+            echo "No changed files detected; nothing to check." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          else
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "${CHANGED_FILES}" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          DISALLOWED=""
+          for f in ${CHANGED_FILES}; do
+            if [ "${f}" != "main.py" ]; then
+              DISALLOWED="${DISALLOWED}\n${f}"
+            fi
+          done
+
+          if [ -n "${DISALLOWED}" ]; then
+            echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
+            echo 'The workflow only permits changes to `main.py`. The following files were modified:' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "${DISALLOWED#\n}" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "Disallowed modification(s) detected; failing." >> "$GITHUB_STEP_SUMMARY"
+            echo "Disallowed modification(s) detected: ${DISALLOWED#\n}" >&2
+            exit 1
+          fi
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -50,45 +102,7 @@ jobs:
 
           FAIL=0
 
-          # Determine base ref for diff (works for push and PR). We'll try base SHA, then base branch, then origin/main
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            BASE_BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-            BASE_BRANCH_NAME="${{ github.ref_name }}"
-          fi
-
-          # Try fetch by SHA first (fast), then by branch name, then fallback to origin/main
-          if [ -n "${BASE_SHA}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
-            BASE_REF="${BASE_SHA}"
-          elif [ -n "${BASE_BRANCH_NAME}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_BRANCH_NAME}" >/dev/null 2>&1; then
-            BASE_REF="origin/${BASE_BRANCH_NAME}"
-          else
-            echo "Could not fetch base (${BASE_SHA:-<none>}, branch ${BASE_BRANCH_NAME:-<none>}); falling back to origin/main" >> "$GITHUB_STEP_SUMMARY"
-            git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
-            BASE_REF="origin/main"
-          fi
-
-          CHANGED_FILES="$(git diff --name-only ${BASE_REF}...HEAD || true)"
-          echo "### Changed files" >> "$GITHUB_STEP_SUMMARY"
-          if [ -z "${CHANGED_FILES}" ]; then
-            echo "No changed files detected; nothing to check." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          else
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "${CHANGED_FILES}" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          # Enforce that only main.py may be modified — fail immediately if any other file changed
-          for f in ${CHANGED_FILES}; do
-            if [ "${f}" != "main.py" ]; then
-              echo "Only 'main.py' may be modified in this workflow" >> "$GITHUB_STEP_SUMMARY"
-              echo "Workflow disallowed modification detected: ${f}" >&2
-              exit 1
-            fi
-          done
+          # (Changed-files check already performed earlier.)
 
           # Syntax check
           SYNTAX_OUT="/tmp/syntax.txt"
