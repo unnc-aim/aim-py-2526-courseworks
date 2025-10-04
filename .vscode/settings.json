@@ -13,6 +13,7 @@
         "dmypy",
         "elif",
         "envrc",
+        "esac",
         "htmlcov",
         "ipynb",
         "ipython",
@@ -45,9 +46,6 @@
         "UNNC",
         "venv",
         "webassets"
-    ],
-    "python.testing.pytestArgs": [
-        "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true
