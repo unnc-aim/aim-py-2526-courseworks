@@ -62,14 +62,20 @@ jobs:
 
           DISALLOWED_LIST=()
           for f in ${CHANGED_FILES}; do
-            if [ "${f}" != "main.py" ]; then
-              DISALLOWED_LIST+=("${f}")
-            fi
+            # Allow edits to top-level main.py (legacy) and any files inside src/main/
+            case "${f}" in
+              main.py|src/main/*)
+                # allowed
+                ;;
+              *)
+                DISALLOWED_LIST+=("${f}")
+                ;;
+            esac
           done
 
           if [ ${#DISALLOWED_LIST[@]} -gt 0 ]; then
             echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
-            echo 'The workflow only permits changes to `main.py`, but disallowed modification(s) detected in these files:' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The workflow only permits changes to `main.py` or files under `src/main/`, but disallowed modification(s) detected in these files:' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             printf '%s\n' "${DISALLOWED_LIST[@]}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -79,11 +85,6 @@ jobs:
           else 
             echo "- Status: ✅ Passed" >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
 
       - name: Install tooling
         run: |
@@ -115,9 +116,13 @@ jobs:
 
           # (Changed-files check already performed earlier.)
 
-          # Syntax check
+          # Syntax check: prefer package file under src/main, fall back to top-level main.py
           SYNTAX_OUT="/tmp/syntax.txt"
-          python -m py_compile main.py 2>"${SYNTAX_OUT}" || true
+          if [ -f src/main/__init__.py ]; then
+            python -m py_compile src/main/__init__.py 2>"${SYNTAX_OUT}" || true
+          else
+            python -m py_compile main.py 2>"${SYNTAX_OUT}" || true
+          fi
           if [ -s "${SYNTAX_OUT}" ]; then
             append_summary "Syntax check" "❌ Failed" "${SYNTAX_OUT}"
             FAIL=1
@@ -126,14 +131,18 @@ jobs:
             rm -f "${SYNTAX_OUT}"
           fi
 
-          # autopep8 style diff
+          # autopep8 style diff: check the package file if present, else top-level main.py
           APEP8_OUT="/tmp/autopep8.txt"
-          autopep8 --diff main.py >"${APEP8_OUT}" || true
+          if [ -f src/main/__init__.py ]; then
+            autopep8 --diff src/main/__init__.py >"${APEP8_OUT}" || true
+          else
+            autopep8 --diff main.py >"${APEP8_OUT}" || true
+          fi
           if [ -s "${APEP8_OUT}" ]; then
             append_summary "autopep8 (style)" "❌ Issues" "${APEP8_OUT}"
             FAIL=1
           else
-            append_summary "autopep8 (style)" "✅ Passed" "${APEP8_OUT}"
+            append_summary "autopep8 (style)" "✅ Passed"
             rm -f "${APEP8_OUT}"
           fi
 
@@ -141,8 +150,8 @@ jobs:
           PYTEST_OUT="/tmp/pytest.txt"
           if [ "${GITHUB_REPOSITORY}" = "unnc-aim/aim-py-2526-courseworks" ]; then
             append_summary "pytest" "⏭️ Skipped for upstream repository"
-          elif [ -d tests ]; then
-            pytest -q tests/ >"${PYTEST_OUT}" 2>&1 || true
+          elif [ -d src/tests ]; then
+            pytest -q src/tests/ >"${PYTEST_OUT}" 2>&1 || true
             if [ -s "${PYTEST_OUT}" ] && grep -Eqi 'failed|error|FAILED|ERROR' "${PYTEST_OUT}" 2>/dev/null; then
               append_summary "pytest" "❌ See details" "${PYTEST_OUT}"
               FAIL=1
@@ -151,7 +160,7 @@ jobs:
               rm -f "${PYTEST_OUT}"
             fi
           else
-            append_summary "pytest" "⏭️ Skipped (no tests/ directory)"
+            append_summary "pytest" "⏭️ Skipped (no src/tests/ directory)"
           fi
 
           SUBMIT_URL="https://github.com"
