@@ -20,6 +20,17 @@ jobs:
         run: |
           set -eo pipefail
 
+          # Skip changed files check for the upstream repository
+          if [ "${GITHUB_REPOSITORY}" = "unnc-aim/aim-py-2526-courseworks" ]; then
+            echo "# Tests" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Files changed" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⏭️ Skipped for upstream repository (${GITHUB_REPOSITORY})" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Status: ⏭️ Skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           # determine current branch name (fallback if GITHUB_REF_NAME not set)
           CURRENT_BRANCH="${GITHUB_REF_NAME:-${GITHUB_REF#refs/heads/}}"
 
@@ -128,7 +139,9 @@ jobs:
 
           # pytest
           PYTEST_OUT="/tmp/pytest.txt"
-          if [ -d tests ]; then
+          if [ "${GITHUB_REPOSITORY}" = "unnc-aim/aim-py-2526-courseworks" ]; then
+            append_summary "pytest" "⏭️ Skipped for upstream repository"
+          elif [ -d tests ]; then
             pytest -q tests/ >"${PYTEST_OUT}" 2>&1 || true
             if [ -s "${PYTEST_OUT}" ] && grep -Eqi 'failed|error|FAILED|ERROR' "${PYTEST_OUT}" 2>/dev/null; then
               append_summary "pytest" "❌ See details" "${PYTEST_OUT}"
