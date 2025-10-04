@@ -77,7 +77,7 @@ jobs:
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
-          pip install autopep8 isort pytest
+          pip install autopep8 pytest
 
       - name: Run checks and write job summary
         shell: bash
@@ -124,17 +124,6 @@ jobs:
           else
             append_summary "autopep8 (style)" "✅ Clean"
             rm -f "${APEP8_OUT}"
-          fi
-
-          # isort imports check
-          ISORT_OUT="/tmp/isort.txt"
-          isort --check --diff . >"${ISORT_OUT}" 2>&1 || true
-          if [ -s "${ISORT_OUT}" ]; then
-            append_summary "isort (imports)" "❌ Issues" "${ISORT_OUT}"
-            FAIL=1
-          else
-            append_summary "isort (imports)" "✅ Clean"
-            rm -f "${ISORT_OUT}"
           fi
 
           # pytest

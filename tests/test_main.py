@@ -10,5 +10,4 @@ def test_main_outputs_hello_world():
     proc = subprocess.run([sys.executable, 'main.py'],
                           cwd=project_root, capture_output=True, text=True)
     output = (proc.stdout or '') + (proc.stderr or '')
-    assert 'Hello World' in output.lower(
-    ), f"Expected 'Hello World' in output, got:\n{output!r}"
+    assert 'Hello World' in output, f"Expected 'Hello World' in output, got:\n{output!r}"
