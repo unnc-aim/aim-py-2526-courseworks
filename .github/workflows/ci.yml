@@ -60,11 +60,11 @@ jobs:
 
           if [ ${#DISALLOWED_LIST[@]} -gt 0 ]; then
             echo "### Disallowed modifications" >> "$GITHUB_STEP_SUMMARY"
-            echo 'The workflow only permits changes to `main.py`' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The workflow only permits changes to `main.py`, but disallowed modification(s) detected in these files:' >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             printf '%s\n' "${DISALLOWED_LIST[@]}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "Disallowed modification(s) detected." >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ Disallowed modification(s) detected." >> "$GITHUB_STEP_SUMMARY"
             printf 'Disallowed modification(s) detected: %s\n' "${DISALLOWED_LIST[*]}" >&2
             exit 1
           fi
