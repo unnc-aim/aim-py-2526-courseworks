@@ -41,8 +41,10 @@ jobs:
           fi
 
           CHANGED_FILES="$(git diff --name-only ${BASE_REF}...HEAD || true)"
-          echo "## Tests" >> "$GITHUB_STEP_SUMMARY"
-          echo "### Changed files" >> "$GITHUB_STEP_SUMMARY"
+          echo "# Tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Files changed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ -z "${CHANGED_FILES}" ]; then
             echo "No changed files detected; nothing to check." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -95,7 +97,7 @@ jobs:
             echo "## ${title}" >> "$GITHUB_STEP_SUMMARY"
             echo "- Status: ${status}" >> "$GITHUB_STEP_SUMMARY"
             if [ -n "${file}" ] && [ -s "${file}" ]; then
-              echo '' >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               sed -n '1,500p' "${file}" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -125,7 +127,7 @@ jobs:
             append_summary "autopep8 (style)" "❌ Issues" "${APEP8_OUT}"
             FAIL=1
           else
-            append_summary "autopep8 (style)" "✅ Passed"
+            append_summary "autopep8 (style)" "✅ Passed" "${APEP8_OUT}"
             rm -f "${APEP8_OUT}"
           fi
 
@@ -137,10 +139,7 @@ jobs:
               append_summary "pytest" "❌ See details" "${PYTEST_OUT}"
               FAIL=1
             else
-              append_summary "pytest" "✅ Passed"
-              echo "```" >> "$GITHUB_STEP_SUMMARY"
-              echo "${PYTEST_OUT}" >> "$GITHUB_STEP_SUMMARY"
-              echo "```" >> "$GITHUB_STEP_SUMMARY"
+              append_summary "pytest" "✅ Passed" "${PYTEST_OUT}"
               rm -f "${PYTEST_OUT}"
             fi
           else
@@ -151,13 +150,16 @@ jobs:
             echo "One or more checks failed. See job summary above for details." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           else
-            echo "All checks passed." >> "$GITHUB_STEP_SUMMARY"
-            SUBMIT_URL="TODO"
+            SUBMIT_URL="https://github.com"
             RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "## Submission" >> "$GITHUB_STEP_SUMMARY"
-            echo "- 请将 [这个链接(hover and copy link)](${RUN_URL}) 复制并提交到作业提交问卷：" >> "$GITHUB_STEP_SUMMARY"
+            
+            echo "## 🎉 All checks passed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "<${SUBMIT_URL}>" >> "$GITHUB_STEP_SUMMARY"
+            echo "# Submission" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "请将 [这个链接(hover and copy link)](${RUN_URL}) 复制并连同姓名、学号、学校邮箱提交到我们的作业问卷：" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- <${SUBMIT_URL}>" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Action run URL: ${RUN_URL}"
             exit 0
