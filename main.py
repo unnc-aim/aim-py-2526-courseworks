@@ -1,5 +1,6 @@
 """
 A simple robot simulator on a 2D grid.
+The robot can move forward, turn left, turn right and find an enemy on the grid.
 """
 
 from enum import Enum
