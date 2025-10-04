@@ -82,7 +82,6 @@ class Grid():
         '''
         从 position_history 字典中获取指定步数的坐标
         如果该步数不存在，返回 None
-        提示：使用字典的 get 方法
         '''
         pass  # TODO: Question 5b
 
