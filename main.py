@@ -7,3 +7,14 @@ main.py
 class Robot:
     def __init__(self):
         pass
+
+
+def main() -> None:
+    """Simple CLI entrypoint for the assignment.
+
+    Prints the required greeting when the module is executed as a script.
+    """
+    print("Hello World")
+
+if __name__ == "__main__":
+    main()

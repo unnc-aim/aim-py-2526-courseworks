@@ -2,12 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-
-permissions:
-  contents: write  # allow the workflow to commit reports
+    branches: [main]
 
 jobs:
   test-and-lint:
@@ -16,112 +13,126 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          persist-credentials: true
-      
-      - name: Ensure no files other than main.py were modified
+          python-version: "3.x"
+
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install autopep8 isort pytest
+
+      - name: Run checks and write job summary
+        shell: bash
         run: |
           set -eo pipefail
-          echo "Determining base SHA..."
+
+          # helper: append a titled block to the GitHub Actions job summary
+          append_summary() {
+            local title="$1"
+            local status="$2"
+            local file="$3"
+            echo "## ${title}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Status: ${status}" >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "${file}" ] && [ -s "${file}" ]; then
+              echo '' >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              sed -n '1,500p' "${file}" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          FAIL=0
+
+          # Determine base ref for diff (works for push and PR)
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
           else
             BASE_SHA="${{ github.event.before }}"
           fi
-            
-          # Try to fetch the base SHA; if that fails, fall back to origin/main
+
           if git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
             BASE_REF="${BASE_SHA}"
           else
-            echo "Could not fetch base SHA (${BASE_SHA}); falling back to origin/main"
+            echo "Could not fetch base SHA (${BASE_SHA}); falling back to origin/main" >> "$GITHUB_STEP_SUMMARY"
             git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
             BASE_REF="origin/main"
           fi
-            
-          echo "Comparing HEAD against ${BASE_REF}..."
+
           CHANGED_FILES="$(git diff --name-only ${BASE_REF}...HEAD || true)"
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-            
-          # If no changed files detected, allow the job to continue
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No changed files detected."
+          echo "### Changed files" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "${CHANGED_FILES}" ]; then
+            echo "No changed files detected; nothing to check." >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          else
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "${CHANGED_FILES}" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
-            
-          # Fail if any changed file is not exactly main.py
-          for f in $CHANGED_FILES; do
-            if [ "$f" != "main.py" ]; then
-              echo "Error: file modified other than main.py: $f"
-              exit 1
+
+          # Enforce that only main.py may be modified
+          for f in ${CHANGED_FILES}; do
+            if [ "${f}" != "main.py" ]; then
+              echo "Only 'main.py' may be modified in this workflow; found: ${f}" >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
             fi
-              done
-            
-          echo "Only main.py was modified. Passing this check."
+          done
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install autopep8 isort pytest
-
-      - name: Run checks and collect reports
-        run: |
-          set -eo pipefail
-          mkdir -p reports
-          STATUS=0
-
-          echo "Running syntax check on main.py..."
-          # py_compile returns non-zero on syntax errors; capture stderr
-          python -m py_compile main.py 2> reports/syntax-report.txt || STATUS=1
-          if [ ! -s reports/syntax-report.txt ]; then
-            rm -f reports/syntax-report.txt
-          fi
-
-          echo "Checking autopep8 (style) for main.py..."
-          # autopep8 --diff prints diffs when changes are needed
-          autopep8 --diff main.py > reports/autopep8-report.txt || true
-          if [ ! -s reports/autopep8-report.txt ]; then
-            rm -f reports/autopep8-report.txt
+          # Syntax check
+          SYNTAX_OUT="/tmp/syntax.txt"
+          python -m py_compile main.py 2>"${SYNTAX_OUT}" || true
+          if [ -s "${SYNTAX_OUT}" ]; then
+            append_summary "Syntax check" "❌ Failed" "${SYNTAX_OUT}"
+            FAIL=1
           else
-            STATUS=1
+            append_summary "Syntax check" "✅ Passed"
+            rm -f "${SYNTAX_OUT}"
           fi
 
-          echo "Checking imports with isort..."
-          # isort --check will exit non-zero if imports need sorting; capture diff/output
-          isort --check --diff . > reports/isort-report.txt 2>&1 || true
-          if [ ! -s reports/isort-report.txt ]; then
-            rm -f reports/isort-report.txt
+          # autopep8 style diff
+          APEP8_OUT="/tmp/autopep8.txt"
+          autopep8 --diff main.py >"${APEP8_OUT}" || true
+          if [ -s "${APEP8_OUT}" ]; then
+            append_summary "autopep8 (style)" "❌ Issues" "${APEP8_OUT}"
+            FAIL=1
           else
-            STATUS=1
+            append_summary "autopep8 (style)" "✅ Clean"
+            rm -f "${APEP8_OUT}"
           fi
 
-          echo "Running pytest under tests/ ..."
-          pytest -q tests/ > reports/pytest-report.txt 2>&1 || STATUS=1
-
-          # store status for later inspection (not strictly required)
-          echo "$STATUS" > reports/ci-status.txt
-
-      - name: Commit and push reports (if any)
-        run: |
-          if [ -d reports ] && [ "$(ls -A reports)" ]; then
-            echo "Reports generated; committing to repository..."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add reports
-            git commit -m "ci: add/refresh CI reports" || echo "No changes to commit"
-            git push
+          # isort imports check
+          ISORT_OUT="/tmp/isort.txt"
+          isort --check --diff . >"${ISORT_OUT}" 2>&1 || true
+          if [ -s "${ISORT_OUT}" ]; then
+            append_summary "isort (imports)" "❌ Issues" "${ISORT_OUT}"
+            FAIL=1
           else
-            echo "No reports generated."
+            append_summary "isort (imports)" "✅ Clean"
+            rm -f "${ISORT_OUT}"
           fi
 
-      - name: Fail job if any report exists
-        run: |
-          if [ -d reports ] && [ "$(ls -A reports)" ]; then
-            echo "One or more checks failed. Reports are in the 'reports' directory and were pushed to the repo."
+          # pytest
+          PYTEST_OUT="/tmp/pytest.txt"
+          if [ -d tests ]; then
+            pytest -q tests/ >"${PYTEST_OUT}" 2>&1 || true
+            if [ -s "${PYTEST_OUT}" ] && grep -Eqi 'failed|error|FAILED|ERROR' "${PYTEST_OUT}" 2>/dev/null; then
+              append_summary "pytest" "❌ See details" "${PYTEST_OUT}"
+              FAIL=1
+            else
+              append_summary "pytest" "✅ Passed"
+              rm -f "${PYTEST_OUT}"
+            fi
+          else
+            append_summary "pytest" "⏭️ Skipped (no tests/ directory)"
+          fi
+
+          if [ "${FAIL}" -ne 0 ]; then
+            echo "One or more checks failed. See job summary above for details." >> "$GITHUB_STEP_SUMMARY"
             exit 1
+          else
+            echo "All checks passed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
