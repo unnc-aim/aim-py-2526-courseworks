@@ -7,12 +7,15 @@ on:
     branches: [main]
 
 jobs:
-  test-and-lint:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -47,17 +50,22 @@ jobs:
 
           FAIL=0
 
-          # Determine base ref for diff (works for push and PR)
+          # Determine base ref for diff (works for push and PR). We'll try base SHA, then base branch, then origin/main
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            BASE_BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
           else
             BASE_SHA="${{ github.event.before }}"
+            BASE_BRANCH_NAME="${{ github.ref_name }}"
           fi
 
-          if git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
+          # Try fetch by SHA first (fast), then by branch name, then fallback to origin/main
+          if [ -n "${BASE_SHA}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_SHA}" >/dev/null 2>&1; then
             BASE_REF="${BASE_SHA}"
+          elif [ -n "${BASE_BRANCH_NAME}" ] && git fetch --no-tags --prune --depth=1 origin "${BASE_BRANCH_NAME}" >/dev/null 2>&1; then
+            BASE_REF="origin/${BASE_BRANCH_NAME}"
           else
-            echo "Could not fetch base SHA (${BASE_SHA}); falling back to origin/main" >> "$GITHUB_STEP_SUMMARY"
+            echo "Could not fetch base (${BASE_SHA:-<none>}, branch ${BASE_BRANCH_NAME:-<none>}); falling back to origin/main" >> "$GITHUB_STEP_SUMMARY"
             git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
             BASE_REF="origin/main"
           fi
