@@ -47,8 +47,13 @@ jobs:
         run: |
           echo "🔧 Creating develop branch from main..."
           git checkout -b develop
-          git push origin develop
-          echo "✅ develop branch created and pushed"
+          if git push origin develop; then
+            echo "✅ develop branch created and pushed"
+          else
+            echo "❌ Failed to push develop branch - likely a permissions issue"
+            echo "permission_error=true" >> $GITHUB_ENV
+            exit 1
+          fi
 
       - name: Sync develop with main
         if: steps.check-develop.outputs.exists == 'true'
@@ -78,7 +83,13 @@ jobs:
             echo "✅ Fast-forward merge successful"
             
             # 推送更新到远程 develop 分支
-            git push origin develop
+            if git push origin develop; then
+              echo "✅ Push to develop successful"
+            else
+              echo "❌ Failed to push to develop branch - likely a permissions issue"
+              echo "permission_error=true" >> $GITHUB_ENV
+              exit 1
+            fi
             
             DEVELOP_AFTER=$(git rev-parse HEAD)
             echo "📋 develop branch after sync: $DEVELOP_AFTER"
@@ -128,4 +139,19 @@ jobs:
             echo "✅ **Result**: develop branch is now in sync with main" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Result**: Sync failed - manual intervention may be required" >> $GITHUB_STEP_SUMMARY
+            
+            # Check if it's a permission error
+            if [ "${permission_error:-false}" = "true" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "## 🔧 Permission Error Fix" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "The sync failed due to insufficient permissions. To fix this:" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "1. Go to your repository **Settings** → **Actions** → **General**" >> $GITHUB_STEP_SUMMARY
+              echo "2. Under **Workflow permissions**, select **Read and write permissions**" >> $GITHUB_STEP_SUMMARY
+              echo "3. Check **Allow GitHub Actions to create and approve pull requests** (optional)" >> $GITHUB_STEP_SUMMARY
+              echo "4. Click **Save** and re-run this workflow" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Direct link**: \`https://github.com/${{ github.repository }}/settings/actions\`" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
