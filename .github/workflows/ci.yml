@@ -20,23 +20,28 @@ jobs:
         run: |
           set -eo pipefail
 
+          # Skip changed files check for the upstream repository
+          if [ "${GITHUB_REPOSITORY}" = "unnc-aim/aim-py-2526-courseworks" ]; then
+            echo "# Tests" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Files changed" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⏭️ Skipped for upstream repository (${GITHUB_REPOSITORY})" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Status: ⏭️ Skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           # determine current branch name (fallback if GITHUB_REF_NAME not set)
           CURRENT_BRANCH="${GITHUB_REF_NAME:-${GITHUB_REF#refs/heads/}}"
 
-          if [ "${CURRENT_BRANCH}" = "main" ]; then
-            # For pushes to main (commonly after a merged PR), comparing against origin/main
-            # may yield no changes because origin/main is already updated to the new HEAD.
-            # Instead compare against the previous commit on main (HEAD^), which corresponds
-            # to the state of main immediately before this push/merge.
-            if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-              BASE_REF="$(git rev-parse HEAD^)"
-            else
-              # edge case: no parent commit exists (very shallow repo); fall back to origin/main
-              git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
-              BASE_REF="origin/main"
-            fi
+          # Compute the repository's first (root) commit and compare against it so that
+          # changes are always reported relative to the initial project state.
+          if git rev-list --max-parents=0 HEAD >/dev/null 2>&1; then
+            INITIAL_COMMIT="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+            BASE_REF="${INITIAL_COMMIT}"
           else
-            # non-main branches: compare with latest origin/main as before
+            # fallback: if we can't find the root commit (very shallow checkout),
+            # compare with latest origin/main as a safe default.
             git fetch --no-tags --prune --depth=1 origin main >/dev/null 2>&1 || true
             BASE_REF="origin/main"
           fi
@@ -134,7 +139,9 @@ jobs:
 
           # pytest
           PYTEST_OUT="/tmp/pytest.txt"
-          if [ -d tests ]; then
+          if [ "${GITHUB_REPOSITORY}" = "unnc-aim/aim-py-2526-courseworks" ]; then
+            append_summary "pytest" "⏭️ Skipped for upstream repository"
+          elif [ -d tests ]; then
             pytest -q tests/ >"${PYTEST_OUT}" 2>&1 || true
             if [ -s "${PYTEST_OUT}" ] && grep -Eqi 'failed|error|FAILED|ERROR' "${PYTEST_OUT}" 2>/dev/null; then
               append_summary "pytest" "❌ See details" "${PYTEST_OUT}"
@@ -181,7 +188,6 @@ jobs:
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "Note: runs on non-main branches will not be considered final submissions. If you need the final result, please merge into the main branch and view the run on the main branch." >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "Action run URL: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           fi
