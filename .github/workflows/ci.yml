@@ -163,7 +163,7 @@ jobs:
             append_summary "pytest" "⏭️ Skipped (no src/tests/ directory)"
           fi
 
-          SUBMIT_URL="https://github.com"
+          SUBMIT_URL="https://forms.office.com/r/iveyDHB7Zp"
           RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
           # determine current branch name (fallback if GITHUB_REF_NAME not set)
@@ -172,7 +172,7 @@ jobs:
           if [ "${FAIL}" -ne 0 ]; then
             echo "## ❌ One or more checks failed. See job summary above for details." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "If you want to give up, you may copy [this link (hover and copy link)](${RUN_URL}) and submit it together with your name, student ID, and school email to our assignment questionnaire:" >> "$GITHUB_STEP_SUMMARY"
+            echo "If you want to give up, you may copy [this link (hover and copy link)](${RUN_URL}) and submit it together with your name and student ID to our assignment questionnaire:" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "- <${SUBMIT_URL}>" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -186,7 +186,7 @@ jobs:
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "# Submission" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "Please copy [this link (hover and copy link)](${RUN_URL}) and submit it together with your name, student ID, and school email to our assignment questionnaire:" >> "$GITHUB_STEP_SUMMARY"
+              echo "Please copy [this link (hover and copy link)](${RUN_URL}) and submit it together with your name and student ID to our assignment questionnaire:" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "- <${SUBMIT_URL}>" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
